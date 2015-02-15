@@ -5,3 +5,5 @@ Hootsuite and Twitter / LinkedIn based on insights automatically distilled from 
 
 ###1) data obtained via the Google Analytics API (traffic statistics about 50,000 live DSC articles), and 
 ###2) data collected via a web crawler written in Python
+
+The corresponding python code is on test. Next step is optimization
