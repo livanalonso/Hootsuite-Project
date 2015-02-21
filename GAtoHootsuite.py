@@ -7,6 +7,7 @@ import re
 import urllib
 import html2text
 import requests
+import time
 
 #Read Google Analytics file
 file=raw_input("Enter Google Analytics file name: ")
@@ -25,35 +26,59 @@ mobile_index=[]
 list_page=data['Page']
 count=0;
 
-for page in list_page:
-	##Check if page belongs to either DSC, AB or it does not exist. Create new column with values 1,2,0 respectively
+def url_check(page):
+	## This function return if page belongs to either DSC, AB , BDN or it does not exist. Create new column with values 1,2,3 or 0 respectively
 	dsc='http://www.datasciencecentral.com'
 	ab='http://www.analyticbridge.com'
 	bdn='http://www.bigdatanews.com'
-	
 	url=dsc+page
 	resp = requests.get(url)
-	
 	if (resp.status_code < 400):
-		data.ix[count,'exist']=1
-		data.ix[count,'url']=url
+		number=1
+		checkurl=url
 	else:
 		url=ab+page
-		resp = requests.get(url)
-	
+		resp = requests.get(url)	
 		if (resp.status_code < 400):
-			data.ix[count,'exist']=2
-			data.ix[count,'url']=url
+			number=2
+			checkurl=url
 		else:
 			url=bdn+page
 			resp = requests.get(url)
-	
 			if (resp.status_code < 400):
-				data.ix[count,'exist']=3
-				data.ix[count,'url']=url
+				number=3
+				checkurl=url
 			else:
-				data.ix[count,'exist']=0
-				data.ix[count,'url']=""
+				number=0
+				checkurl=""
+	return [number,checkurl]
+
+def extract_title(url):
+	## Function for extracting title and published date of Blog
+	titlefile=urllib.urlopen(url)
+	sourceCode=titlefile.read()
+	titlefile.close()
+	splitTitle=re.findall(r'<meta property="og:title" content="(.*?)" />',sourceCode)
+	splitDate=re.findall('</a><a class="nolink"> on (.*?)at',sourceCode)
+	if len (splitTitle)!=0:
+		thereisTitle=1
+		Title=html2text.html2text(''.join(splitTitle))
+		Title=Title.replace('\n','')
+	else:
+		thereisTitle=0
+		data.ix[count,'Title']=''
+	if len (splitDate)!=0:
+		date=''.join(splitDate)
+	else:
+		date=''	
+	return [thereisTitle,Title,date]
+
+for page in list_page:
+	## Call function url_check(page) to check if page belongs to either DSC, AB , BDN or it does not exist. Create new column with values 1,2,3 or 0 respectively
+	data.ix[count,'exist']=url_check(page)[0]
+	url=url_check(page)[1]
+	data.ix[count,'url']=url
+	
 	
 	##The following code analyzes if the page is mobile page and correct number of Pageviews, Unique Pageviews and Entrances from Desktop link
 	stoppages=['/m/404','/m/signup','/m/signin?target=http://www.datasciencecentral.com/profiles/profile/emailSettings?xg_source=msg_mes_network','/m/signup?target=/m&cancelUrl=/m','/m/signin?target=/m&cancelUrl=/m','/jobs/search/results?page=2','/forum?page=4','/jobs/search/advanced','/profiles/blog/list?page=3','/profiles/settings/editPassword','/main/invitation/new?xg_source=userbox','/main/authorization/passwordResetSent?previousUrl=http://www.analyticbridge.com/main/authorization/doSignIn?target=http://www.analyticbridge.com/','/profiles/friend/list?page=4','/main/index/banned','/main/invitation/new?xg_source=empty_list']
@@ -95,30 +120,11 @@ for page in list_page:
 					data.ix[index_desktop,'Unique Pageviews']=data.ix[index_desktop,'Unique Pageviews']+data.ix[count,'Unique Pageviews']
 					data.ix[index_desktop,'Entrances']=data.ix[index_desktop,'Entrances']+data.ix[count,'Entrances']
 
-	## Extract title of Blog
-	titlefile=urllib.urlopen(url)
-	sourceCode=titlefile.read()
-	titlefile.close()
-	splitTitle=re.findall(r'<meta property="og:title" content="(.*?)" />',sourceCode)
-	splitDate=re.findall('</a><a class="nolink"> on (.*?)at',sourceCode)
-
-
-	if len (splitTitle)!=0:
-		data.ix[count,'ThereisTitle']=1
-		data.ix[count,'Title']=html2text.html2text(''.join(splitTitle))
-		data.ix[count,'Title']=data.ix[count,'Title'].replace('\n','')
-	else:
-		data.ix[count,'ThereisTitle']=0
-		data.ix[count,'Title']=''
-
-	if len (splitDate)!=0:
-		##DatePub=time.strptime(''.join(splitDate),'%B %d, %Y')
-		data.ix[count,'Date']=''.join(splitDate)
-
-	else:
-		data.ix[count,'Date']=''	
+	data.ix[count,'ThereisTitle']=extract_title(url)[0]
+	data.ix[count,'Title']=extract_title(url)[1]
+	data.ix[count,'Date']=extract_title(url)[2]
 	
-	print count, data.ix[count,'Title'],url,data.ix[count,'Date']
+	print count, data.ix[count,'Title'],data.ix[count,'url'],data.ix[count,'Date']
 	
 	count=count+1
 	
@@ -151,7 +157,3 @@ unique_data.to_csv("FullTopBlogsDSCAB5000.csv",sep=",", index = False, encoding=
 data_to_save=unique_data[['Title','url','Date','Pageviews']]
 fileName="TopDSCABBlogsPage"+file
 data_to_save.to_csv(fileName,sep=",", index = False, encoding='utf-8')
-
-
-
-
